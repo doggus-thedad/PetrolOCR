@@ -23,7 +23,6 @@
         <div class="bg-slate-800 border border-slate-700 rounded-xl p-6 space-y-4">
             <label class="block text-xs font-semibold text-slate-400 mb-1">Select Photo or Snap Receipt:</label>
             
-            <!-- File input updated with capture="environment" for rear camera access -->
             <input type="file" id="file-input" accept="image/*" capture="environment" class="w-full text-sm text-slate-300 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-blue-600 file:text-white hover:file:bg-blue-500 cursor-pointer" />
             
             <button id="scan-btn" disabled class="w-full py-2 bg-blue-600 disabled:bg-slate-700 hover:bg-blue-500 font-semibold rounded-lg transition">
@@ -37,14 +36,33 @@
         <div class="bg-slate-800 border border-slate-700 rounded-xl p-6 space-y-3">
             <h2 class="text-lg font-semibold text-slate-200">Receipt Details</h2>
             <div class="grid grid-cols-2 gap-3">
-                <input type="text" id="station-input" placeholder="Station Name" class="bg-slate-900 border border-slate-700 rounded p-2 text-sm text-white" />
-                <input type="text" id="date-input" placeholder="Date (YYYY-MM-DD)" class="bg-slate-900 border border-slate-700 rounded p-2 text-sm text-white" />
-                <input type="text" id="fuel-input" placeholder="Fuel Type" class="bg-slate-900 border border-slate-700 rounded p-2 text-sm text-white" />
-                <input type="number" step="0.01" id="volume-input" placeholder="Volume (Liters)" class="bg-slate-900 border border-slate-700 rounded p-2 text-sm text-white" />
+                <div>
+                    <label class="block text-xs font-semibold text-slate-400 mb-1">Company / Station Name</label>
+                    <input type="text" id="company-input" placeholder="e.g. Petronas / Shell" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-sm text-white" />
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-400 mb-1">Receipt Number</label>
+                    <input type="text" id="receipt-no-input" placeholder="e.g. INV-104928" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-sm text-white" />
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-400 mb-1">Date</label>
+                    <input type="text" id="date-input" placeholder="YYYY-MM-DD" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-sm text-white" />
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-400 mb-1">Fuel Type</label>
+                    <input type="text" id="fuel-input" placeholder="e.g. RON95, Diesel" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-sm text-white" />
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-400 mb-1">Volume (Liters)</label>
+                    <input type="number" step="0.01" id="volume-input" placeholder="e.g. 35.50" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-sm text-white" />
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-400 mb-1">Total Amount ($ / RM)</label>
+                    <input type="number" step="0.01" id="total-input" placeholder="e.g. 72.80" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-sm text-white" />
+                </div>
             </div>
-            <input type="number" step="0.01" id="total-input" placeholder="Total Amount ($ / RM)" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-sm text-white" />
 
-            <button id="add-btn" class="w-full py-2 bg-emerald-600 hover:bg-emerald-500 font-semibold rounded-lg">
+            <button id="add-btn" class="w-full py-2 bg-emerald-600 hover:bg-emerald-500 font-semibold rounded-lg mt-2">
                 Add Record to Table
             </button>
         </div>
@@ -57,18 +75,21 @@
                     Export to Excel (.xlsx)
                 </button>
             </div>
-            <table class="w-full text-left text-xs">
-                <thead>
-                    <tr class="border-b border-slate-700 text-slate-400">
-                        <th class="p-2">Station</th>
-                        <th class="p-2">Date</th>
-                        <th class="p-2">Fuel</th>
-                        <th class="p-2">Volume</th>
-                        <th class="p-2">Total</th>
-                    </tr>
-                </thead>
-                <tbody id="table-body" class="divide-y divide-slate-700"></tbody>
-            </table>
+            <div class="overflow-x-auto">
+                <table class="w-full text-left text-xs">
+                    <thead>
+                        <tr class="border-b border-slate-700 text-slate-400">
+                            <th class="p-2">Company Name</th>
+                            <th class="p-2">Receipt No</th>
+                            <th class="p-2">Date</th>
+                            <th class="p-2">Fuel</th>
+                            <th class="p-2">Volume (L)</th>
+                            <th class="p-2">Total</th>
+                        </tr>
+                    </thead>
+                    <tbody id="table-body" class="divide-y divide-slate-700"></tbody>
+                </table>
+            </div>
         </div>
     </div>
 
@@ -95,21 +116,35 @@
 
                 statusText.innerText = 'Scanning complete!';
                 
-                // Simple pattern matching rules
-                let station = "Unknown";
-                if (/petronas/i.test(text)) station = "Petronas";
-                else if (/shell/i.test(text)) station = "Shell";
-                else if (/caltex/i.test(text)) station = "Caltex";
-                else if (/bhp/i.test(text)) station = "BHPetrol";
-                else if (/petron/i.test(text)) station = "Petron";
+                // 1. Extract Company / Station Name
+                let company = "Unknown Company";
+                if (/petronas/i.test(text)) company = "Petronas";
+                else if (/shell/i.test(text)) company = "Shell";
+                else if (/caltex/i.test(text)) company = "Caltex";
+                else if (/bhp/i.test(text)) company = "BHPetrol";
+                else if (/petron/i.test(text)) company = "Petron";
 
+                // 2. Extract Receipt / Invoice Number
+                const receiptNoMatch = text.match(/(?:INV|INVOICE|REC|RECEIPT|TAX INVOICE|DOC|SLIP)\s*#?\s*[:\.]?\s*([A-Z0-9\-\/]{4,18})/i) || text.match(/NO\s*[:\.]?\s*([A-Z0-9\-\/]{4,18})/i);
+
+                // 3. Extract Date
                 const dateMatch = text.match(/\b\d{2}[\/\.-]\d{2}[\/\.-]\d{2,4}\b/) || text.match(/\b\d{4}[\/\.-]\d{2}[\/\.-]\d{2}\b/);
+
+                // 4. Extract Fuel Type
+                let fuel = "RON95";
+                if (/ron97/i.test(text)) fuel = "RON97";
+                else if (/diesel/i.test(text)) fuel = "Diesel";
+                else if (/v-power/i.test(text)) fuel = "V-Power";
+
+                // 5. Extract Volume & Total
                 const volumeMatch = text.match(/(\d+\.\d{2})\s*(L|Litre)/i) || text.match(/VOL(?:UME)?\s*[:\.]?\s*(\d+\.\d{2})/i);
                 const totalMatch = text.match(/(?:TOTAL|AMOUNT|RM|\$)\s*[:\.]?\s*(\d+\.\d{2})/i);
 
-                document.getElementById('station-input').value = station;
+                // Populate Input Fields
+                document.getElementById('company-input').value = company;
+                document.getElementById('receipt-no-input').value = receiptNoMatch ? receiptNoMatch[1] : '';
                 document.getElementById('date-input').value = dateMatch ? dateMatch[0] : new Date().toISOString().split('T')[0];
-                document.getElementById('fuel-input').value = /ron97/i.test(text) ? "RON97" : (/diesel/i.test(text) ? "Diesel" : "RON95");
+                document.getElementById('fuel-input').value = fuel;
                 document.getElementById('volume-input').value = volumeMatch ? volumeMatch[1] : '';
                 document.getElementById('total-input').value = totalMatch ? totalMatch[1] : '';
 
@@ -123,16 +158,24 @@
         // Add Record to List
         document.getElementById('add-btn').addEventListener('click', () => {
             const item = {
-                Station: document.getElementById('station-input').value || 'N/A',
-                Date: document.getElementById('date-input').value || 'N/A',
-                Fuel: document.getElementById('fuel-input').value || 'N/A',
-                Volume: parseFloat(document.getElementById('volume-input').value) || 0,
-                Total: parseFloat(document.getElementById('total-input').value) || 0,
+                "Company Name": document.getElementById('company-input').value || 'N/A',
+                "Receipt No": document.getElementById('receipt-no-input').value || 'N/A',
+                "Date": document.getElementById('date-input').value || 'N/A',
+                "Fuel Type": document.getElementById('fuel-input').value || 'N/A',
+                "Volume (L)": parseFloat(document.getElementById('volume-input').value) || 0,
+                "Total Price": parseFloat(document.getElementById('total-input').value) || 0,
             };
             records.push(item);
 
             const tr = document.createElement('tr');
-            tr.innerHTML = `<td class="p-2">${item.Station}</td><td class="p-2">${item.Date}</td><td class="p-2">${item.Fuel}</td><td class="p-2">${item.Volume}</td><td class="p-2">${item.Total}</td>`;
+            tr.innerHTML = `
+                <td class="p-2 font-medium">${item["Company Name"]}</td>
+                <td class="p-2">${item["Receipt No"]}</td>
+                <td class="p-2">${item.Date}</td>
+                <td class="p-2">${item["Fuel Type"]}</td>
+                <td class="p-2">${item["Volume (L)"]}</td>
+                <td class="p-2">${item["Total Price"]}</td>
+            `;
             document.getElementById('table-body').appendChild(tr);
         });
 
@@ -142,7 +185,7 @@
             const worksheet = XLSX.utils.json_to_sheet(records);
             const workbook = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(workbook, worksheet, "Petrol Receipts");
-            XLSX.writeFile(workbook, "Petrol_Receipts.xlsx");
+            XLSX.writeFile(workbook, `Petrol_Receipts_${new Date().toISOString().split('T')[0]}.xlsx`);
         });
     </script>
 </body>
