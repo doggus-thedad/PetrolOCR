@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Petrol Receipt Scanner</title>
+    <!-- Tailwind CSS for styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Tesseract.js for free local OCR -->
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+    <!-- SheetJS for exporting to Excel -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen p-6">
+
+    <div class="max-w-3xl mx-auto space-y-6">
+        <header class="text-center">
+            <h1 class="text-3xl font-bold text-blue-400">⛽ Petrol Receipt Scanner</h1>
+            <p class="text-slate-400 text-sm mt-1">Scan petrol receipts for free and export records to Excel.</p>
+        </header>
+
+        <!-- Image Upload / Camera Snap Section -->
+        <div class="bg-slate-800 border border-slate-700 rounded-xl p-6 space-y-4">
+            <label class="block text-xs font-semibold text-slate-400 mb-1">Select Photo or Snap Receipt:</label>
+            
+            <!-- File input updated with capture="environment" for rear camera access -->
+            <input type="file" id="file-input" accept="image/*" capture="environment" class="w-full text-sm text-slate-300 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-blue-600 file:text-white hover:file:bg-blue-500 cursor-pointer" />
+            
+            <button id="scan-btn" disabled class="w-full py-2 bg-blue-600 disabled:bg-slate-700 hover:bg-blue-500 font-semibold rounded-lg transition">
+                Scan Receipt
+            </button>
+            
+            <p id="status-text" class="text-xs text-yellow-400 text-center"></p>
+        </div>
+
+        <!-- Form for Reviewing Extracted Data -->
+        <div class="bg-slate-800 border border-slate-700 rounded-xl p-6 space-y-3">
+            <h2 class="text-lg font-semibold text-slate-200">Receipt Details</h2>
+            <div class="grid grid-cols-2 gap-3">
+                <input type="text" id="station-input" placeholder="Station Name" class="bg-slate-900 border border-slate-700 rounded p-2 text-sm text-white" />
+                <input type="text" id="date-input" placeholder="Date (YYYY-MM-DD)" class="bg-slate-900 border border-slate-700 rounded p-2 text-sm text-white" />
+                <input type="text" id="fuel-input" placeholder="Fuel Type" class="bg-slate-900 border border-slate-700 rounded p-2 text-sm text-white" />
+                <input type="number" step="0.01" id="volume-input" placeholder="Volume (Liters)" class="bg-slate-900 border border-slate-700 rounded p-2 text-sm text-white" />
+            </div>
+            <input type="number" step="0.01" id="total-input" placeholder="Total Amount ($ / RM)" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-sm text-white" />
+
+            <button id="add-btn" class="w-full py-2 bg-emerald-600 hover:bg-emerald-500 font-semibold rounded-lg">
+                Add Record to Table
+            </button>
+        </div>
+
+        <!-- Table & Export -->
+        <div class="bg-slate-800 border border-slate-700 rounded-xl p-6 space-y-4">
+            <div class="flex justify-between items-center">
+                <h2 class="text-lg font-semibold text-slate-200">Scanned Records</h2>
+                <button id="export-btn" class="py-2 px-4 bg-green-600 hover:bg-green-500 text-sm font-semibold rounded-lg">
+                    Export to Excel (.xlsx)
+                </button>
+            </div>
+            <table class="w-full text-left text-xs">
+                <thead>
+                    <tr class="border-b border-slate-700 text-slate-400">
+                        <th class="p-2">Station</th>
+                        <th class="p-2">Date</th>
+                        <th class="p-2">Fuel</th>
+                        <th class="p-2">Volume</th>
+                        <th class="p-2">Total</th>
+                    </tr>
+                </thead>
+                <tbody id="table-body" class="divide-y divide-slate-700"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        const fileInput = document.getElementById('file-input');
+        const scanBtn = document.getElementById('scan-btn');
+        const statusText = document.getElementById('status-text');
+        const records = [];
+
+        fileInput.addEventListener('change', () => scanBtn.disabled = !fileInput.files[0]);
+
+        // OCR Recognition Process
+        scanBtn.addEventListener('click', async () => {
+            const file = fileInput.files[0];
+            if (!file) return;
+
+            statusText.innerText = 'Scanning text from image...';
+            scanBtn.disabled = true;
+
+            try {
+                const worker = await Tesseract.createWorker('eng');
+                const { data: { text } } = await worker.recognize(file);
+                await worker.terminate();
+
+                statusText.innerText = 'Scanning complete!';
+                
+                // Simple pattern matching rules
+                let station = "Unknown";
+                if (/petronas/i.test(text)) station = "Petronas";
+                else if (/shell/i.test(text)) station = "Shell";
+                else if (/caltex/i.test(text)) station = "Caltex";
+                else if (/bhp/i.test(text)) station = "BHPetrol";
+                else if (/petron/i.test(text)) station = "Petron";
+
+                const dateMatch = text.match(/\b\d{2}[\/\.-]\d{2}[\/\.-]\d{2,4}\b/) || text.match(/\b\d{4}[\/\.-]\d{2}[\/\.-]\d{2}\b/);
+                const volumeMatch = text.match(/(\d+\.\d{2})\s*(L|Litre)/i) || text.match(/VOL(?:UME)?\s*[:\.]?\s*(\d+\.\d{2})/i);
+                const totalMatch = text.match(/(?:TOTAL|AMOUNT|RM|\$)\s*[:\.]?\s*(\d+\.\d{2})/i);
+
+                document.getElementById('station-input').value = station;
+                document.getElementById('date-input').value = dateMatch ? dateMatch[0] : new Date().toISOString().split('T')[0];
+                document.getElementById('fuel-input').value = /ron97/i.test(text) ? "RON97" : (/diesel/i.test(text) ? "Diesel" : "RON95");
+                document.getElementById('volume-input').value = volumeMatch ? volumeMatch[1] : '';
+                document.getElementById('total-input').value = totalMatch ? totalMatch[1] : '';
+
+            } catch (e) {
+                statusText.innerText = 'Error processing receipt.';
+            } finally {
+                scanBtn.disabled = false;
+            }
+        });
+
+        // Add Record to List
+        document.getElementById('add-btn').addEventListener('click', () => {
+            const item = {
+                Station: document.getElementById('station-input').value || 'N/A',
+                Date: document.getElementById('date-input').value || 'N/A',
+                Fuel: document.getElementById('fuel-input').value || 'N/A',
+                Volume: parseFloat(document.getElementById('volume-input').value) || 0,
+                Total: parseFloat(document.getElementById('total-input').value) || 0,
+            };
+            records.push(item);
+
+            const tr = document.createElement('tr');
+            tr.innerHTML = `<td class="p-2">${item.Station}</td><td class="p-2">${item.Date}</td><td class="p-2">${item.Fuel}</td><td class="p-2">${item.Volume}</td><td class="p-2">${item.Total}</td>`;
+            document.getElementById('table-body').appendChild(tr);
+        });
+
+        // Export to Excel File
+        document.getElementById('export-btn').addEventListener('click', () => {
+            if (records.length === 0) return alert('Add at least one record first!');
+            const worksheet = XLSX.utils.json_to_sheet(records);
+            const workbook = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(workbook, worksheet, "Petrol Receipts");
+            XLSX.writeFile(workbook, "Petrol_Receipts.xlsx");
+        });
+    </script>
+</body>
+</html>
